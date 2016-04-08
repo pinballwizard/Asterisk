@@ -1,0 +1,7 @@
+//Здесь мобильные телефоны
+context mobilephone {
+
+    _*777 => goto outcoming,83912193002,1;
+    _*778 => goto outcoming,89994404662,1;
+
+}

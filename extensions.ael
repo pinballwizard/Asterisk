@@ -1,0 +1,41 @@
+//#include "extensions.conf"
+#include "dialplan.ael"
+#include "service.ael"
+#include "ivr.ael"
+#include "mobilephone.ael"
+#include "informer.ael"
+
+globals {
+//Переменные номера
+    manager=2030;
+    security=2436;
+//Настройки почты
+    post_server=mail.ksk.loc:587; // адрес почтового сервера
+    fax_email=info@kraseco24.ru; // куда отправлять факсы
+    notify_email=linux@kraseco24.ru; // куда отправлять уведомления
+    self_email=sccm@kraseco24.ru; // кем представиться
+    smtp_user=sccm@kraseco24.ru;
+    smtp_pass=;
+
+    sound_path=/usr/share/asterisk/sounds;
+// Основные голосовые промты
+    main=/usr/share/asterisk/sounds/main/main;
+// Голосовые записи министерства
+    hello_ministry=/usr/share/asterisk/sounds/ministry/hello_ministry;
+    night_ministry=/usr/share/asterisk/sounds/ministry/night_ministry;
+    busy_ministry=/usr/share/asterisk/sounds/ministry/busy_ministry;
+//Голосовые промты для горячей линии
+    hotline_hello=/usr/share/asterisk/sounds/hotline/hello;
+    emergency=/usr/share/asterisk/sounds/hotline/emergency;
+    e_krasnoyarsk=/usr/share/asterisk/sounds/hotline/krasnoyarsk;
+    e_aban=/usr/share/asterisk/sounds/hotline/aban;
+    e_achinsk=/usr/share/asterisk/sounds/hotline/achinsk;
+    e_balahta=/usr/share/asterisk/sounds/hotline/balahta;
+    e_eniseisk=/usr/share/asterisk/sounds/hotline/eniseisk;
+    e_boguchany=/usr/share/asterisk/sounds/hotline/boguchany;
+    services=/usr/share/asterisk/sounds/hotline/services;
+    busy=/usr/share/asterisk/sounds/hotline/busy;
+    hot_night=/usr/share/asterisk/sounds/hotline/hot_night;
+    service_night=/usr/share/asterisk/sounds/hotline/service_night;
+    trust_night=/usr/share/asterisk/sounds/hotline/trust_night;
+}

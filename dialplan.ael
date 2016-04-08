@@ -1,0 +1,272 @@
+context company {
+    includes {
+        outcoming;
+        parkedcalls;
+        invalid;
+    }
+
+    _[2-7]XXX => jump ${EXTEN}@localdial;
+    _8[2-7]XXX => jump ${EXTEN:1}@localdial; // from MS Lync
+
+    _8886 => {
+        Answer;
+        Background(/usr/share/asterisk/sounds/main/test);
+    }
+    _8885 => jump listen@informer;
+    _8883 => &states(nochan);
+    _9XXXX => Dial(SIP/lync/${EXTEN});
+    _8887 => &queue(test);
+    _8888 => jump s@hotline;
+
+//Конференция
+    _8000 => Confbridge([8000][,default_bridge[,default_user[,default_menu]]]); 
+
+    _**[2-6]XXX => PickUp(${EXTEN:2});
+}
+
+context BLF {
+    hint(SIP/${EXTEN}) _[2-6]XXX => NoOp;
+}
+
+context outcoming {
+    _[0-1]XX => {
+        number=${EXTEN};
+        jump telezone@outcoming;
+    }
+    _XXXXXXX => {
+        number=${EXTEN};
+        jump telezone@outcoming;
+    }
+    _XXXXXXXXXXX => {
+        number=${EXTEN};
+        jump telezone@outcoming;
+    }
+    _880[1-35-9]XXXXXXX => &states(forbidden); //Платные номера
+    _XXXXXXXXXXXXXX => {
+        number=${EXTEN};
+        jump telezone@outcoming;
+    }
+    _XXXXXXXXXXXXXXX => {
+        number=${EXTEN};
+        jump telezone@outcoming;
+    }
+    telezone => {
+        switch (${CALLERID(NUM)}) {
+            case 2600:
+                &trunk_check(to_telezone);
+                provider=to_telezone2;
+                caller=83912286207;
+                break;
+            pattern 25XX:
+                &trunk_check(to_telezone_kic);
+                caller=83912266607;
+                provider=to_telezone_kic;
+                break;
+            pattern 27XX:
+                &trunk_check(to_telezone_ministry);
+                caller=83912266604;
+                provider=to_telezone_ministry;
+                break;
+            default:
+                &trunk_check(to_telezone);
+                provider=to_telezone;
+                caller=83912192302;
+        }
+        jump ${number}@outdial;
+    }
+}
+
+context incoming {
+// Основная линия
+    _3912192302 => {
+        Verbose(==========Calling from telezone==========);
+        Verbose(Busy Lines = ${GROUP_COUNT(telezone_incoming)});
+        GROUP()=telezone_incoming;
+        GROUP()=kraseco;
+        Verbose(DIAL ${CALLERID(all)} to ${EXTEN});
+        jump s@kraseco;
+    }
+
+    _3912286203 => {
+        Verbose(==========Calling from telezone==========);
+        Verbose(Busy Lines = ${GROUP_COUNT(telezone_incoming)});
+        GROUP()=telezone_incoming;
+        GROUP()=hotline;
+        Verbose(DIAL ${CALLERID(all)} to ${EXTEN});
+        jump s@hotline;
+    }
+
+// Старая линия
+    _3912286207 => {
+        Verbose(==========Calling from telezone==========);
+        Verbose(Busy Lines = ${GROUP_COUNT(telezone_incoming)});
+        GROUP()=telezone_incoming;
+        GROUP()=kraseco;
+        Verbose(DIAL ${CALLERID(all)} to ${EXTEN});
+        jump s@kraseco;
+    }
+
+    _3912286212 => {
+        Verbose(==========Calling from telezone==========);
+        Verbose(Busy Lines = ${GROUP_COUNT(telezone_incoming)});
+        GROUP()=telezone_incoming;
+        GROUP()=kraseco;
+        Verbose(DIAL ${CALLERID(all)} to ${EXTEN});
+        jump 2020@company;
+    }
+
+    _3912286215 => {
+        Verbose(==========Calling from telezone==========);
+        Verbose(Busy Lines = ${GROUP_COUNT(telezone_incoming)});
+        GROUP()=telezone_incoming;
+        GROUP()=kraseco;
+        Verbose(DIAL ${CALLERID(all)} to ${EXTEN});
+        &queue(law);
+    }
+
+    _3912286220 => {
+        Verbose(==========Calling from telezone==========);
+        Verbose(Busy Lines = ${GROUP_COUNT(telezone_incoming)});
+        GROUP()=telezone_incoming;
+        GROUP()=kraseco;
+        Verbose(DIAL ${CALLERID(all)} to ${EXTEN});
+        jump 2020@company;
+    }
+
+    _3912286224 => {
+        Verbose(==========Calling from telezone==========);
+        Verbose(Busy Lines = ${GROUP_COUNT(telezone_incoming)});
+        GROUP()=telezone_incoming;
+        GROUP()=kraseco;
+        Verbose(DIAL ${CALLERID(all)} to ${EXTEN});
+        jump 2030@company;
+    }
+
+    _3912266918 => {
+        Verbose(==========Calling from telezone==========);
+        Verbose(Busy Lines = ${GROUP_COUNT(telezone_incoming)});
+        GROUP()=telezone_incoming;
+        GROUP()=kraseco;
+        Verbose(DIAL ${CALLERID(all)} to ${EXTEN});
+        &queue(dispatcher);
+    }
+
+    _391226660[4-5] => {
+        Verbose(==========Calling from telezone==========);
+        Verbose(Busy Lines = ${GROUP_COUNT(telezone_incoming)});
+        GROUP()=telezone_incoming;
+        GROUP()=ministry;
+        Verbose(DIAL ${CALLERID(all)} to ${EXTEN});
+        jump s@ministry;
+    }
+
+    _391226660[7-8] => {
+        Verbose(==========Calling from telezone==========);
+        Verbose(Busy Lines = ${GROUP_COUNT(telezone_incoming)});
+        GROUP()=telezone_incoming;
+        GROUP()=kic;
+        Verbose(DIAL ${CALLERID(all)} to ${EXTEN});
+        jump s@kic;
+    }
+
+    _39122862XX => {
+        Verbose(==========Calling from telezone==========);
+        Verbose(Busy Lines = ${GROUP_COUNT(telezone_incoming)});
+        GROUP()=telezone_incoming;
+        Verbose(DIAL ${CALLERID(all)} to ${EXTEN});
+        jump s@kraseco;
+    }
+
+// Телефон коррупции
+    _88007758996 => {
+        Verbose(==========Calling from corruption line==========);
+        Set(CALLERID(name)="Линия по коррупции");
+        Verbose(Busy Lines = ${GROUP_COUNT(corruption)});
+        GROUP()=corruption;
+        Verbose(DIAL ${CALLERID(all)} to ${EXTEN});
+        jump s@corruption;
+    }
+
+//Проверка неправильного номера от провайдера
+    _XX. => {
+        Set(header="Звонок с неверного номера");
+        Set(message="От провайдера поступил звонок с неправильного номера ${EXTEN}");
+        Set(attachment="");
+        &sendmail(${header},${message},${notify_email},${attachment});
+        Hangup();
+    }
+    h => &hang(${DIALSTATUS});
+}
+
+context localdial {
+    _[2-6]XXX => {
+        Verbose(DIAL ${CALLERID(all)} to ${EXTEN});
+        number=${EXTEN};
+        &callrecord(rec);
+        Verbose(DEVICE_STATE => ${DEVICE_STATE(SIP/${EXTEN})});
+        Dial(SIP/${EXTEN},60,tT);
+        Verbose(DIALSTATUS => ${DIALSTATUS});
+        &device_check(${DEVICE_STATE(SIP/${EXTEN})});
+        Hangup;
+    }
+
+//    _*[2-6]XXX => jump ${EXTEN}@mobilephone;
+    _XXXXXX. => jump ${EXTEN}@outcoming;
+    h => &hang(${DIALSTATUS});
+    t => Hangup;
+    i => &states(invalid);
+}
+
+context queue-office-out {
+    1 => jump *${manager}@mobilephone;
+}
+
+context outdial {
+    _XX. => {
+        ifTime(22:00-6:00|*|*|*)
+            &states(day-night);
+        &callrecord(rec);
+        Set(CALLERID(all)="${caller}" <${caller}>);
+//        Verbose(CALLERID = ${CALLERID(all)});
+        Dial(SIP/${provider}/${EXTEN},60,tT);
+//        &dialstatus_check(${DIALSTATUS});
+        Hangup;
+    }
+    _*[2-6]XXX => jump ${EXTEN}@mobilephone;
+    _[2-6]XXX => jump ${EXTEN}@company;
+    h => &hang(${DIALSTATUS});
+    i => &states(invalid);
+}
+
+macro hang(status) {
+    Verbose(DIALSTATUS => ${status});
+    if ("${status}"="ANSWER")
+        &callrecord(stop);
+    else
+        &callrecord(del);
+    Hangup;
+    return;
+}
+
+macro dialstatus_check(status) {
+    Verbose(DIALSTATUS => ${status});
+    if ("${status}"="INVALID")
+        &states(invalid);
+    if ("${status}"="BUSY")
+        &states(busy);
+    if ("${status}"="UNAVAILABLE")
+        &states(unavailable);
+    return;
+}
+
+macro device_check(status) {
+    Verbose(DEVICE STATE => ${status});
+    if ("${status}"="INVALID")
+        &states(invalid);
+    if ("${status}"="BUSY")
+        &states(busy);
+    if ("${status}"="UNAVAILABLE")
+        &states(unavailable);
+    return;
+}
+

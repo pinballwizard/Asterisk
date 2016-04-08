@@ -1,0 +1,238 @@
+macro callrecord(do) {
+    switch(${do}) {
+        case rec:
+            Set(recordname=[${STRFTIME(${EPOCH},,%Y-%m-%d %H_%M_%S)}] ${CALLERID(num)} ${CALLERID(name)} -to- ${number});
+            Set(recordpath=/home/callrecords/${STRFTIME(${EPOCH},,%Y-%m)});
+            Set(recordfile=${recordpath}/${recordname}.wav);
+            System(chmod 777 "${recordpath}");
+            Verbose(systemstatus = ${SYSTEMSTATUS});
+            Set(callernum=${CALLERID(num)});
+            MixMonitor(${recordfile});
+            Set(AUDIOHOOK_INHERIT(MixMonitor)=yes);
+            System(chmod 777 "${recordfile}");
+            Verbose(systemstatus = ${SYSTEMSTATUS});
+            break;
+        case del:
+            StopMixMonitor;
+            System(chmod 777 "${recordfile}");
+            Verbose(systemstatus = ${SYSTEMSTATUS});
+            System(rm "${recordfile}");
+            Verbose(systemstatus = ${SYSTEMSTATUS});
+            break;
+        case stop:
+            StopMixMonitor;
+            System(chmod 777 "${recordfile}");
+            Verbose(systemstatus = ${SYSTEMSTATUS});
+            if("${number}" = "2172" | "${callernum}" = "2172"){
+                Set(drecordpath=/home/dispatcher_callrecords/${STRFTIME(${EPOCH},,%Y-%m)});
+                System(cp "${recordfile}" "${drecordpath}/${recordname}.wav");
+                Verbose(systemstatus = ${SYSTEMSTATUS});
+            }
+            break;
+        default:
+            break;
+    }
+    return;
+}
+
+macro queue(name){
+    Set(qrecordname=[${STRFTIME(${EPOCH},,%Y-%m-%d %H_%M_%S)}]);
+    Set(qrecordpath=/home/callrecords/${STRFTIME(${EPOCH},,%Y-%m)});
+    Set(qrecordfile=${qrecordpath}/${qrecordname}.wav);
+    System(chmod 777 "${qrecordpath}");
+    Verbose(systemstatus = ${SYSTEMSTATUS});
+    Set(MONITOR_FILENAME=${qrecordpath}/${qrecordname});
+    Set(AUDIOHOOK_INHERIT(MixMonitor)=yes);
+    Queue(${name},tTkKc);
+    Hangup;
+    return;
+}
+
+context queue {
+    h => {
+        Verbose(${QUEUESTATUS});
+        System(chmod 777 "${qrecordfile}");
+        Verbose(systemstatus = ${SYSTEMSTATUS});
+        Set(macro_filename=${qrecordname} ${CALLERID(num)} ${CALLERID(name)} -to- ${QUEUENAME} ${MEMBERNAME:4});
+        Set(macro_filepath=${qrecordpath}/${macro_filename}.wav);
+        System(mv "${qrecordfile}" "${macro_filepath}");
+        Verbose(systemstatus = ${SYSTEMSTATUS});
+        System(chmod 777 "${macro_filepath}");
+        Verbose(systemstatus = ${SYSTEMSTATUS});
+        if ("${QUEUENAME}" = "dispatcher"){
+            Set(dispatcher_filepath=/home/dispatcher_callrecords/${STRFTIME(${EPOCH},,%Y-%m)});
+            Set(dispatcher_file=${dispatcher_filepath}/${macro_filename}.wav);
+            System(mkdir "${dispatcher_filepath}");
+            Verbose(systemstatus = ${SYSTEMSTATUS});
+            System(cp "${macro_filepath}" "${dispatcher_file}");
+            Verbose(systemstatus = ${SYSTEMSTATUS});
+        }
+    }
+}
+
+context invalid {
+    _X. => &states(invalid);
+}
+
+macro trunk_check(trunk_name) {
+    Verbose(==========Connecting ${trunk_name}==========);
+    ChanIsAvail(SIP/${trunk_name});
+    if ("${AVAILCHAN}"="")
+        &states(nochan);
+    Verbose(==========Count available line number==========);
+    if (${GROUP_COUNT(${trunk_name})}>=20)
+        &states(busyline);
+    GROUP()=${trunk_name};
+    Verbose(BUSY LINES => ${GROUP_COUNT(${trunk_name})});
+    return;
+}
+
+macro states(state_name) {
+    switch(${state_name}){
+        case busy:
+            &play(${busy_ministry});
+            break;
+        case invalid:
+            &play(pbx-invalid);
+            break;
+        case day-night:
+            Answer();
+            &say("Звонки в ночное время запрещены.");
+            Hangup;
+            break;
+        case unavailable:
+            Answer();
+            &say("Абонент выключен или недоступен.");
+            Hangup;
+            break;
+        case busyline:
+            Answer();
+            &say("Все линии заняты. Пожалуйста сообщите системному администратору.");
+            Hangup;
+            break;
+        case nochan:
+            Answer();
+            &say("Отсутствует связь с провайдером. Пожалуйста сообщите системному администратору.");
+            Hangup;
+            break;
+        case forbidden:
+            Answer();
+            &say("Звонки на данные номера запрещены.");
+            Hangup;
+            break;
+        case busy_ministry:
+            &play(${busy_ministry});
+            break;
+        case night_ministry:
+            &play(${night_ministry});
+            break;
+        default:
+            break;
+    }
+    return;
+}
+
+macro play(play_file) {
+    Answer;
+    Wait(1);
+    Playback(${play_file});
+    Hangup;
+    return;
+}
+
+context fax-rx {
+    rx => {
+        Verbose(------------------- FAX from ${CALLERID(number)} ------------------);
+        &callrecord(del);
+        Set(faxfile=/home/fax/${STRFTIME(${EPOCH},,%Y%m%d_%H.%M.%S)}-from-${CALLERID(num)});
+        Set(FAXOPT(headerinfo)="Received by ${CALLERID(number)} ${STRFTIME(${EPOCH},,%Y-%m-%d %H-%M)}");
+        Set(FAXOPT(localstationid)="SibIng");
+        &fax-info();
+        ReceiveFax(${faxfile}.tif,dfs);
+    hangup_error:
+        &fax-stat();
+	if ("${FAXOPT(status)}"="FAILED")
+            jump error@fax-rx;
+        System(convert ${faxfile}.tif ${faxfile}.pdf);
+        Set(header="Входящий факс");
+        Set(message1="Это автоматическое сообщение. ");
+        Set(message2="Вам пришел факс с номера ${CALLERID(num)} в ${STRFTIME(${EPOCH},,%H:%M:%S)}. ");
+        Set(message3="Содержимое факса находится во вложении. ");
+        Set(message=${message1}${message2}${message3});
+        Set(attachment="${faxfile}.pdf");
+        &sendmail(${header},${message},${fax_email},${attachment});
+//        System(rm ${faxfile}.tif ${faxfile}.pdf);
+        Hangup;
+    }
+    error => {
+        Set(header="Ошибка при получении факса");
+        Set(message1="Это автоматическое сообщение. ");
+        Set(message2="Была произведена попытка отправить вам факс с номера ${CALLERID(num)} в ${STRFTIME(${EPOCH},,%H:%M:%S)}. ");
+        Set(message3="Из-за ошибки ${FAXOPT(error)} в передаче сообщение небыло принято. ");
+        Set(message4="Попробуйте еще раз, при повторении ошибки обратитесь к системному администратору. ");
+        Set(message=${message1}${message2}${message3}${message4});
+        Set(attachment="");
+        &sendmail(${header},${message},${fax_email},${attachment});
+        &sendmail(${header},${message},${notify_email},${attachment});
+        Hangup;
+    }
+// На случай отбоя факса после успешной передачи
+    h => {
+        if ("${FAXOPT(error)}"="HANGUP")
+            jump rx,hangup_error@fax-rx;
+        Hangup;
+    }
+}
+
+context fax-tx {
+    tx => {
+        Verbose(------------------- FAX from ${CALLERID(number)} ------------------);
+        &callrecord(del);
+        Set(FAXOPT(headerinfo)="Transmitted by ${CALLERID(number)} ${STRFTIME(${EPOCH},,%Y-%m-%d %H-%M)}");
+        Set(FAXOPT(localstationid)=SibIng);
+        &fax-info();
+        SendFax(/usr/dumps/${FAXFILENAME}.tif,d);
+        &fax-stat();
+        if ("${FAXOPT(status)}"="FAILED") 
+            jump error@fax-tx;
+        Set(header="Факс отправлен");
+        Set(message="Факс успешно отправлен на номер : ${CALLERID(number)} в ${STRFTIME(${EPOCH},,%H:%M:%S)}");
+        Set(attachment="");
+        &sendmail(${header},${message},${fax_email},${attachment});
+        Hangup;
+    }
+    error => {
+        time = ${STRFTIME(${EPOCH},,%H:%M:%S)};
+        Set(header="Ошибка при отправлении факса");
+        Set(message1="Это автоматическое сообщение. ");
+        Set(message2="При отправке факса с номера ${CALLERID(num)} в ${time} возникла ошибка вида ${FAXOPT(error)}. ");
+        Set(message3="Попробуйте отправить еще раз, при повторении ошибки обратитесь к системному администратору. ");
+        Set(message=${message1}${message2}${message3});
+        Set(attachment="");
+        &sendmail(${header},${message},${fax_email},${attachment});
+        &sendmail(${header},${message},${notify_email},${attachment});
+        Hangup;
+    }
+}
+
+macro sendmail(header, message, receiver, attachment) {
+    System(sendEmail -f ${self_email} -t ${receiver} -s ${post_server} -xu ${smtp_user} -xp ${smtp_pass} -o message-charset=utf-8 -o tls=auto -u ${header} -a ${attachment} -m ${message});
+    return;
+}
+
+macro fax-info() {
+    Verbose(FAX headerinfo : ${FAXOPT(headerinfo)});
+    Verbose(FAX localstationid : ${FAXOPT(localstationid)});
+    Verbose(FAX maxrate : ${FAXOPT(maxrate)});
+    Verbose(FAX minrate : ${FAXOPT(minrate)});
+    Verbose(FAX ECM : ${FAXOPT(ecm)});
+    return;
+}
+
+macro fax-stat() {
+    Verbose(FAX STATUS : ${FAXOPT(status)});
+    Verbose(VERBOSE FAX STATUS : ${FAXOPT(statusstr)});
+    Verbose(FAX ERROR : ${FAXOPT(error)});
+    Verbose(number is ${CALLERID(number)});
+    return;
+}

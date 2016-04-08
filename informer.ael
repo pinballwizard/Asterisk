@@ -1,0 +1,53 @@
+context informer {
+    s => {
+        Answer();
+        &say(Ваш телефонный номер ${CALLERID(num)});
+        Hangup;
+    }
+    listen => {
+        Answer();
+        &say("Проговорите сообщение после сигнала.");
+        Playback(beep);
+        Set(postfile=/tmp/asterisk/input);
+        Monitor(wav,${postfile},o);
+        Wait(5);
+        StopMonitor();
+        &sendaudio(${postfile});
+        &say("Вы сказали ${recorded}");
+        &say("Досвидания");
+    }
+    h => {
+        StopMonitor();
+        
+    }
+}
+
+macro say(str){
+    Set(ifile=/tmp/asterisk/output);
+//    Set(str=Ваш номер ${CALLERID(num)});
+    Set(http="http://translate.google.com/translate_tts?ie=UTF-8&total=1&idx=0&textlen=32&client=tw-ob&q=${str}&tl=ru");
+    System(wget -q -U Mozilla -O ${ifile}.mp3 ${http});
+    Verbose(${SYSTEMSTATUS});
+    Wait(1);
+    Background(${ifile});
+    return;
+}
+
+macro sendaudio(file){
+    Set(posthttp="https://www.google.com/speech-api/v2/recognize?client=chromium&output=json&lang=ru&key=AIzaSyAcalCzUvPmmJ7CZBFOEWx2Z1ZSn4Vs1gg");
+    Set(httpheader="Content-Type: audio/x-flac; rate=16000;");
+    Set(recognized=/tmp/asterisk/recognized.json);
+    System(sox ${file}-in.wav -r 16000 -c 1 ${file}.flac);
+    Verbose(${SYSTEMSTATUS});
+    Set(postfile=${file}.flac);
+    System(wget -q --post-file ${postfile} --header=${httpheader} -O ${recognized} - ${posthttp});
+    Verbose(${SYSTEMSTATUS});
+    Set(recorded=${SHELL(jq '.result[]' ${recognized} | jq '.alternative[0]' | jq '.transcript')});
+    System(rm ${recognized});
+    Verbose(${SYSTEMSTATUS});
+    System(rm ${file}.flac);
+    Verbose(${SYSTEMSTATUS});
+    System(rm ${file}-in.wav);
+    Verbose(${SYSTEMSTATUS});
+    return;
+}

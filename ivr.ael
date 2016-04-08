@@ -1,0 +1,242 @@
+context hotline {
+    s => {
+        Answer();
+        Wait(1);
+        Background(${hotline_hello});
+        WaitExten(5);
+    }
+    1 => {
+        Read(EXTEN1,${emergency},1,,20);
+        jump ${EXTEN1}@emergency;
+    }
+    2 => {
+        &night_check(${service_night});
+        &queue(techconnection);
+    }
+    3 => {
+        &night_check(${service_night});
+        Read(EXTEN3,${services},1,,20);
+        switch (${EXTEN3}){
+            case 1:
+                jump 83915421634@outcoming; // инспектор в Козульском участке
+            case 2:
+                jump 83919824211@outcoming; // служба учета в Большиемуртинском филиале
+            case 3:
+                jump 83919524128@outcoming; // служба учета в Енисейском филиале
+            case 4:
+                jump 83915622162@outcoming; // служба учета в Ужурском филиале
+            case 5:
+                jump 83915726274@outcoming; // служба учета в Боготольском филиале
+            case 6:
+                jump 83913731818@outcoming; // служба учета в Иланском отделении
+            case 7:
+                &states(invalid); // служба учета в Кодинском филиале
+            case 8:
+                jump 83914375356@outcoming; // служба учета в Заозереновском филиале
+            case 9:
+                jump 4@kraseco; // служба реализации услуг в управлении
+            case #:
+                jump s@hotline; // Возврат в главное меню
+            case 0:
+                jump 3@hotline; // Повтор
+            default:
+                jump 3@hotline;
+        }
+    }
+    4 => {
+        &night_check(${service_night});
+        &queue(heatsale);
+    }
+    5 => {
+        &night_check(${service_night});
+        &queue(exploitation);
+    }
+    6 => jump manager@hotline;
+    0 => jump s@hotline;
+    # => jump manager@hotline;
+    i => &states(invalid);
+    t => jump manager@hotline;
+    manager => {
+        &night_check(${hot_night});
+        &queue(office);
+    }
+}
+
+macro night_check(name) {
+    ifTime(8:00-17:00|mon-fri|*|*){
+        return;
+    }
+    else{
+        Playback(${name});
+        Hangup;
+    }
+    return;
+}
+
+context emergency {
+    1 => {
+        Read(EXTEN11,${e_krasnoyarsk},1,,20);
+        switch (${EXTEN11}){
+            case 1:
+                &queue(dispatcher); // Красноярский Диспетчерский Центр
+            case 2:
+                jump 83919723001@outcoming; // Диспетчер Железногорского филиала
+            case 3:
+                jump 83917521324@outcoming; // Диспетчер Березовского филиала
+            case #:
+                jump 1@hotline; // Уровень вверх
+            case 0:
+                jump s@hotline; // Главное меню
+            default:
+                jump 1@emergency; // Повтор
+        }
+    }
+    2 => jump 83919831459@outcoming; // Диспетчер Большемуртинского филиала
+    3 => {
+        Read(EXTEN13,${e_aban},1,,20);
+        switch (${EXTEN13}){
+            case 1:
+                jump 83916132511@outcoming; // Диспетчер Канского филиала
+            case 2:
+                jump 83917331488@outcoming; // Диспетчер Иланского филиала
+            case 3:
+                jump 83916520678@outcoming; // Диспетчер Заозерновского филиала
+            case #:
+                jump 1@hotline; // Уровень вверх
+            case 0:
+                jump s@hotline; // Главное меню
+            default:
+                jump 3@emergency; // Повтор
+        }
+    }
+    4 => {
+        Read(EXTEN14,${e_achinsk},1,,20);
+        switch (${EXTEN14}){
+            case 1:
+                jump 83915178890@outcoming; // Диспетчер Ачинского филиала
+            case 2:
+                jump 83915725741@outcoming; // Диспетчер Боготольского филиала
+            case #:
+                jump 1@hotline; // Уровень вверх
+            case 0:
+                jump s@hotline; // Главное меню
+            default:
+                jump 4@emergency; // Повтор
+        }
+    }
+    5 => {
+        Read(EXTEN15,${e_balahta},1,,20);
+        switch (${EXTEN15}){
+            case 1:
+                jump 83915622162@outcoming; // Диспетчер Ужурского филиала
+            case 2:
+                jump 83913244096@outcoming; // Диспетчер Минусинского филиала
+            case #:
+                jump 1@hotline; // Уровень вверх
+            case 0:
+                jump s@hotline; // Главное меню
+            default:
+                jump 5@emergency; // Повтор
+        }
+    }
+    6 => {
+        Read(EXTEN16,${e_eniseisk},1,,20);
+        switch (${EXTEN16}){
+            case 1:
+                jump 83919522525@outcoming; // Диспетчер Енисейского филиала
+            case 2:
+                jump 83914543005@outcoming; // Диспетчер Лесосибирского филиала
+            case #:
+                jump 1@hotline; // Уровень вверх
+            case 0:
+                jump s@hotline; // Главное меню
+            default:
+                jump 6@emergency; // Повтор
+        }
+    }
+    7 => {
+        Read(EXTEN17,${e_boguchany},1,,20);
+        switch (${EXTEN17}){
+            case 1:
+                jump 83916224456@outcoming; // Диспетчер Богучанского филиала
+            case 2:
+                jump 83914370233@outcoming; // Диспетчер Кодинского филиала
+            case 3:
+                jump 83914122603@outcoming; // Диспетчер Мотыгинского филиала
+            case #:
+                jump 1@hotline; // Уровень вверх
+            case 0:
+                jump s@hotline; // Главное меню
+            default:
+                jump 7@emergency; // Повтор
+        }
+    }
+    0 => jump 1@hotline; // Повтор
+    # => jump s@hotline; // Главное меню
+    i => &states(invalid);
+    t => &queue(dispatcher);
+}
+
+context kraseco {
+    s => {
+        Answer();
+        Wait(1);
+        Background(${main});
+        WaitExten(5);
+    }
+    _[2-7]XXX => jump ${EXTEN}@company;
+    1 => &queue(archive);		// Канцелярия
+    2 => &queue(techconnection);	// Отдел технологического присоединения
+    3 => &queue(exploitation);		// Служба эксплуатации электрических и тепловых сетей
+    4 => &queue(etransport);
+    4_4 => {
+        Read(SALEEXTEN,${main},1,,20);	// Отдел реализации
+        jump 4_${SALEEXTEN}@kraseco;
+    }
+    4_1 => &queue(heatsale);		// Отдел реализации тепла
+    4_2 => &queue(etransport);		// Отдел транспорта электрической энергии
+    4_3 => &queue(electrosale);		// Отдел реализации электричества
+    5 => &queue(contract);		// Отдел договоров
+    6 => &queue(construction);		// Отдел капитального строительства
+    7 => &queue(purchase);		// Отдел закупок
+    8 => &queue(counting);		// Бухгалтерия
+    9 => &queue(personnel);		// Отдел кадров
+    0 => jump 2286219@outdial;		// Факс
+    88 => jump listen@informer;
+    t => &queue(office);		// Секретари
+    i => &states(invalid);
+}
+
+context kic {
+    s => {
+        ifTime(19:00-7:00|*|*|*)
+            jump 2509@company; // Факс
+        Answer();
+        Wait(1);
+//        Background(${hello_ministry});
+        WaitExten(1);
+    }
+    _2500 => jump ${EXTEN}@company;
+    _25XN => jump ${EXTEN}@company;
+    0 => jump 2509@company; // Факс
+    t => &queue(kic);
+    i => &states(invalid);
+}
+
+context ministry {
+    s => {
+        ifTime(19:00-8:00|*|*|*)
+            &states(night_ministry);
+        Answer();
+        Wait(1);
+        Background(${hello_ministry});
+        WaitExten(10);
+    }
+    _27XX => jump ${EXTEN}@company;
+    t => &states(invalid);
+    i => &states(invalid);
+}
+
+context corruption {
+    s => jump 2437@company; // Безопасники
+}
